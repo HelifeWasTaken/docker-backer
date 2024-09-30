@@ -26,7 +26,7 @@ Run a backup manually when the script is already on:
 docker exec docker-backup-service -d /data -b /backups -m
 ```
 
-## Compose Example:
+## Compose Example
 
 ```yaml
 ---
@@ -45,7 +45,8 @@ services:
             - /backups:/backups
 ```
 
-## Changes to come:
+## Changes to come
+
 Because it is hard to make a real backup this way I intend to change the way the data is backed up.
 The docker will consider /data as it's root folder so you can put `/` as `/data` `(but may not be recommended)` and will hold a dynamic configuration as a json to backup all datas
 
@@ -53,11 +54,13 @@ The docker will consider /data as it's root folder so you can put `/` as `/data`
 {
     "data": [
         "file1path", "file2path", "file3path"
-    ]
+    ],
+    "backup_location": "path"
 }
 ```
 
 The data will then be outputed like this:
+
 ```json
 {
     "version": "version-string",
@@ -76,6 +79,7 @@ The data will then be outputed like this:
     ]
 }
 ```
+
 When is archive is true it means that the given file is a folder otherwise it is a single file
 
 It will then be minified and compressed to avoid losing too much space

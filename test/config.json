@@ -1,0 +1,9 @@
+{
+	"backup_location": "here",
+	"data": [
+		"/etc/",
+		"/home/mattisdalleau/exodata_requirements.txt",
+		"/var/",
+		"/lib"
+	]
+}
