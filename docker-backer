@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+from os.path import getctime
+from sys import exit, stderr
+from argparse import ArgumentParser
+from shutil import make_archive, unpack_archive
+from pathlib import Path
+from time import sleep
+from datetime import datetime
+from crontab import CronTab
+from signal import signal, SIGINT, SIGTERM
+
+def _get_time():
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+def fatal_error(message):
+    print(message, file=stderr)
+    exit(1)
+
+def backup(data, backup):
+    start_time = _get_time()
+    print(f"{start_time} - Creating backup...")
+    make_archive(f"{backup}/backup-{start_time}", 'zip', data)
+    print(f"{_get_time()} - Backup created took {datetime.now() - datetime.strptime(start_time, '%Y-%m-%d-%H-%M-%S')}")
+
+def get_valid_backup(backup_dir):
+    if args.restore != 'latest':
+        _backup = Path(backup_dir) / args.restore
+    else:
+        try:
+            _backup = max(Path(backup_dir).glob('backup-*.zip'), key=getctime)
+        except ValueError:
+            fatal_error("No backups found for 'latest' restore")
+    if not _backup.exists():
+        fatal_error(f"Backup '{_backup}' does not exist")
+    return _backup
+
+def restore(data, backup):
+    unpack_archive(backup, data)
+    print(f"{_get_time()} - Backup restored")
+
+EXIT_FLAG = False
+TASK_RUNNING = False
+
+def exit_handler(sig, frame):
+    global EXIT_FLAG
+    EXIT_FLAG = True
+    if TASK_RUNNING:
+        print(f'{_get_time()} - Received signal {sig}, will exit after current task')
+    else:
+        print(f'{_get_time()} - Received signal {sig}, will exit in < 1 second')
+
+def backup_cron(data, backup, cron):
+    signal(SIGINT, exit_handler)
+    signal(SIGTERM, exit_handler)
+
+    global EXIT_FLAG
+    global TASK_RUNNING
+
+    while not EXIT_FLAG:
+        cinterval = cron.next()
+        elapsed = 0
+        while not EXIT_FLAG and elapsed < cinterval:
+            sleep(1)
+            elapsed += 1
+        if not EXIT_FLAG:
+            TASK_RUNNING = True
+            backup(data, backup)
+            TASK_RUNNING = False
+
+if __name__ == '__main__':
+
+    parser = ArgumentParser(description='Backup service')
+
+    parser.add_argument('--data', '-d', type=str, help='Data directory to backup', default='/data')
+    parser.add_argument('--backup', '-b', type=str, help='Backup directory', default='/backup')
+
+    parser.add_argument('--cron', '-c', type=str, help='Cron schedule', required=False)
+    parser.add_argument('--single', '-s', action='store_true', help='Run a single time', required=False)
+
+    parser.add_argument('--restore', '-r', type=str, help='Restore backup', required=False)
+
+    args = parser.parse_args()
+
+    EXCLUSIVE_ARGS = [('single', args.single), ('cron', args.cron), ('restore', args.restore)]
+
+    data_path = Path(args.data)
+    backup_path = Path(args.backup)
+
+    if not data_path.exists(): fatal_error(f"Data directory '{data_path}' does not exist")
+    if not data_path.is_dir(): fatal_error(f"Data '{data_path}' is not a directory")
+
+    if not backup_path.exists(): fatal_error(f"Backup directory '{backup_path}' does not exist")
+    if not backup_path.is_dir(): fatal_error(f"Backup '{backup_path}' is not a directory")
+
+    if data_path.samefile(backup_path): fatal_error(f"Data and backup directories '{data_path}' cannot be the same")
+    if data_path in backup_path.parents: fatal_error(f"Data '{data_path}' cannot be in backup '{backup_path}'")
+
+    exculsive_args_score = sum(bool(x[1]) for x in EXCLUSIVE_ARGS)
+    exclusive_args_names = [x[0] for x in EXCLUSIVE_ARGS]
+
+    if not exculsive_args_score: fatal_error(f'One of {exclusive_args_names} must be specified')
+    if exculsive_args_score > 1: fatal_error(f'Only one of {exclusive_args_names} can be specified')
+
+    if args.single:
+        backup(args.data, args.backup)
+    elif args.restore:
+        restore(args.data, get_valid_backup(args.backup))
+    else:
+        try:
+            cron = CronTab(args.cron, loop=True)
+        except Exception:
+            fatal_error(f"Invalid cron schedule '{args.cron}'")
+        backup_cron(args.data, args.backup, cron)
+        

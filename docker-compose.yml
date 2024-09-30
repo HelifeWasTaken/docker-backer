@@ -1,0 +1,11 @@
+---
+version: '3'
+
+services:
+  docker-backup-service:
+    image: helife/docker-backer:latest
+    restart: unless-stopped
+    command: "--cron='0 23 * * *'"
+    volumes:
+      - ./data:/data:ro
+      - ./backup:/backup
