@@ -5,4 +5,4 @@ COPY . /app/
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-ENTRYPOINT [ "python3", "docker-backerpy" ]
+ENTRYPOINT [ "python3", "docker-backer" ]
