@@ -67,4 +67,5 @@ options:
 ## Changes to come:
 
 Enforce encryption
+
 An interface to write plugins to send/restore files to/from clouds
